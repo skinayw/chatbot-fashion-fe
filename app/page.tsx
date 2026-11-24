@@ -7,39 +7,60 @@ import EmptyState from "@/components/EmptyState";
 import MessageBubble from "@/components/MessageBubble";
 import ProductCard from "@/components/ProductCard";
 import TypingIndicator from "@/components/TypingIndicator";
-import type { Message, Product } from "@/lib/types";
-
-// Data contoh sementara untuk melihat kartu produk. Nanti diganti data dari Laravel.
-const contohProduk: Product[] = [
-  { name: "Kaos Oversize Basic", price: 89000, image_url: null, slug: "kaos-oversize-basic" },
-  { name: "Kaos Boxy Putih", price: 95000, image_url: null, slug: "kaos-boxy-putih" },
-];
+import { sendChat } from "@/lib/api";
+import type { Message } from "@/lib/types";
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [lastText, setLastText] = useState("");
+  const requestRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  function send(text: string) {
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+  async function ask(text: string) {
+    const myRequest = ++requestRef.current;
     setLoading(true);
 
-    // SEMENTARA: balasan tiruan. Besok diganti fetch ke Laravel.
-    setTimeout(() => {
+    const result = await sendChat(text, conversationId);
+
+    // Kalau pengguna menekan "Percakapan baru" selagi menunggu, abaikan balasan ini.
+    if (myRequest !== requestRef.current) return;
+
+    if (result.ok) {
+      setConversationId(result.conversationId);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Ini balasan contoh untuk: " + text, products: contohProduk },
+        { role: "assistant", content: result.reply, products: result.products },
       ]);
-      setLoading(false);
-    }, 1200);
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: result.message, error: true },
+      ]);
+    }
+    setLoading(false);
+  }
+
+  function send(text: string) {
+    setLastText(text);
+    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    ask(text);
+  }
+
+  function retry() {
+    setMessages((prev) => prev.slice(0, -1)); // buang bubble error terakhir
+    ask(lastText);
   }
 
   function reset() {
+    requestRef.current++;
     setMessages([]);
+    setConversationId(null);
     setLoading(false);
   }
 
@@ -54,7 +75,10 @@ export default function Home() {
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
             {messages.map((m, i) => (
               <div key={i} className="flex flex-col gap-2">
-                <MessageBubble message={m} />
+                <MessageBubble
+                  message={m}
+                  onRetry={m.error && i === messages.length - 1 ? retry : undefined}
+                />
                 {m.products && m.products.length > 0 && (
                   <div className="flex gap-3 overflow-x-auto pb-1">
                     {m.products.map((p) => (
