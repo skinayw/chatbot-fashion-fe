@@ -1,4 +1,5 @@
 import type { Product } from "@/lib/types";
+import type { Message } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -46,4 +47,16 @@ export async function sendChat(
   }
 
   return { ok: false, kind: "busy", message: "Maaf, layanan sedang sibuk. Coba lagi sebentar ya." };
+}
+
+// Ambil riwayat percakapan lama; null kalau tidak ditemukan atau gagal
+export async function getHistory(conversationId: string): Promise<Message[] | null> {
+  try {
+    const res = await fetch(`${API_URL}/chat/${conversationId}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.messages as Message[];
+  } catch {
+    return null;
+  }
 }

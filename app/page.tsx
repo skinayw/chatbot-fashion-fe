@@ -7,7 +7,7 @@ import EmptyState from "@/components/EmptyState";
 import MessageBubble from "@/components/MessageBubble";
 import ProductCard from "@/components/ProductCard";
 import TypingIndicator from "@/components/TypingIndicator";
-import { sendChat } from "@/lib/api";
+import { sendChat, getHistory } from "@/lib/api";
 import type { Message } from "@/lib/types";
 
 export default function Home() {
@@ -17,6 +17,7 @@ export default function Home() {
   const [lastText, setLastText] = useState("");
   const requestRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const STORAGE_KEY = "chat_conversation_id";
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,6 +64,35 @@ export default function Home() {
     setConversationId(null);
     setLoading(false);
   }
+
+  // 1. Saat halaman dibuka: pulihkan percakapan lama kalau ada
+  useEffect(() => {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(STORAGE_KEY);
+    } catch {}
+    if (!saved) return;
+
+    getHistory(saved).then((history) => {
+      if (history && history.length > 0) {
+        setMessages(history);
+        setConversationId(saved);
+      } else {
+        // id sudah tidak valid, bersihkan
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch {}
+      }
+    });
+  }, []);
+
+  // 2. Setiap kali ada conversation_id baru dari server: simpan
+  useEffect(() => {
+    if (!conversationId) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, conversationId);
+    } catch {}
+  }, [conversationId]);
 
   return (
     <div className="flex h-dvh flex-col bg-stone-100 text-zinc-900">
