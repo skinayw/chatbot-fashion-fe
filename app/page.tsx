@@ -10,7 +10,7 @@ import TypingIndicator from "@/components/TypingIndicator";
 import { sendChat, getHistory } from "@/lib/api";
 import type { Message } from "@/lib/types";
 
-export default function Home() {
+export default function Home() {  
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
